@@ -31,35 +31,57 @@
 <body>
 
   <div id="song">
-    <h1 id="title">Wagon Wheel</h1>
-    <div class="meta" id="meta">Key: G | Capo: 2nd Fret</div>
+    <h1 id="title">Loading...</h1>
+    <div class="meta" id="meta"></div>
     <div class="song-body" id="song-body"></div>
   </div>
 
   <script>
-    // Keep phone screen awake while viewing
+    // Keep phone screen awake
     if ('wakeLock' in navigator) {
       navigator.wakeLock.request('screen').catch(() => {});
     }
 
-    // Sample ChordPro Song Content
-    const chordproData = `
-[G]Heading down south to the [D]land of the pines
-I'm [Em]thumbin' my way into [C]North Caroline
-[G]Staring up the road and [D]pray to God I see [C]headlights
-`;
+    // Get the song filename from the URL query parameter (e.g., ?song=crazy-eddies-last-hurrah.txt)
+    const urlParams = new URLSearchParams(window.location.search);
+    const songFile = urlParams.get('song') || 'crazy-eddies-last-hurrah.txt';
 
-    // Parse ChordPro and render chords directly above lyrics
-    function renderChordPro(text) {
+    // Fetch the song file from the /songs/ directory
+    fetch(`songs/${songFile}`)
+      .then(response => {
+        if (!response.ok) throw new Error("Song file not found");
+        return response.text();
+      })
+      .then(text => parseAndRender(text))
+      .catch(err => {
+        document.getElementById('title').textContent = "Error Loading Song";
+        document.getElementById('song-body').textContent = `Could not load songs/${songFile}. Check your file name in GitHub!`;
+      });
+
+    function parseAndRender(text) {
       const container = document.getElementById('song-body');
       container.innerHTML = '';
+      
       const lines = text.trim().split('\n');
+      
+      // Parse header metadata if present (# Title, Key: G)
+      let bodyLines = [];
+      lines.forEach(line => {
+        if (line.startsWith('# ')) {
+          document.getElementById('title').textContent = line.replace('# ', '');
+        } else if (line.startsWith('Key:') || line.startsWith('Artist:')) {
+          const currentMeta = document.getElementById('meta').textContent;
+          document.getElementById('meta').textContent = currentMeta ? `${currentMeta} | ${line}` : line;
+        } else {
+          bodyLines.push(line);
+        }
+      });
 
-      lines.forEach(lineText => {
+      // Render ChordPro lines
+      bodyLines.forEach(lineText => {
         const lineDiv = document.createElement('div');
         lineDiv.className = 'line';
         
-        // Match [Chord] followed by lyrics
         const regex = /(?:\[([^\]]+)\])?([^\[]*)/g;
         let match;
 
@@ -86,8 +108,6 @@ I'm [Em]thumbin' my way into [C]North Caroline
         container.appendChild(lineDiv);
       });
     }
-
-    renderChordPro(chordproData);
   </script>
 </body>
 </html>
