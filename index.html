@@ -1,113 +1,125 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Songbook</title>
-  <style>
-    :root {
-      --bg: #121212;
-      --text: #e0e0e0;
-      --chord: #4fc3f7;
-      --meta: #b0bec5;
-    }
-    body {
-      background-color: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      margin: 0;
-      padding: 16px;
-      line-height: 1.5;
-    }
-    h1 { margin: 0 0 4px 0; font-size: 1.8rem; color: #fff; }
-    .meta { color: var(--meta); font-size: 0.9rem; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 8px; }
-    .song-body { font-family: "Courier New", Courier, monospace; font-size: 1.1rem; }
-    .line { display: flex; flex-wrap: wrap; margin-bottom: 8px; }
-    .pair { display: inline-flex; flex-direction: column; align-items: flex-start; margin-right: 2px; }
-    .chord { color: var(--chord); font-weight: bold; font-size: 0.95rem; min-height: 1.2em; }
-    .lyric { white-space: pre; }
-  </style>
-</head>
-<body>
+<script>
+  // Keep screen awake
+  if ('wakeLock' in navigator) {
+    navigator.wakeLock.request('screen').catch(() => {});
+  }
 
-  <div id="song">
-    <h1 id="title">Loading...</h1>
-    <div class="meta" id="meta"></div>
-    <div class="song-body" id="song-body"></div>
-  </div>
+  const urlParams = new URLSearchParams(window.location.search);
+  const songFile = urlParams.get('song') || 'crazy-eddies-last-hurrah.txt';
 
-  <script>
-    // Keep phone screen awake
-    if ('wakeLock' in navigator) {
-      navigator.wakeLock.request('screen').catch(() => {});
-    }
+  fetch(`songs/${songFile}`)
+    .then(res => res.text())
+    .then(text => renderSong(text))
+    .catch(() => {
+      document.getElementById('title').textContent = "Error Loading Song";
+    });
 
-    // Get the song filename from the URL query parameter (e.g., ?song=crazy-eddies-last-hurrah.txt)
-    const urlParams = new URLSearchParams(window.location.search);
-    const songFile = urlParams.get('song') || 'crazy-eddies-last-hurrah.txt';
+  function renderSong(rawText) {
+    const container = document.getElementById('song-body');
+    container.innerHTML = '';
 
-    // Fetch the song file from the /songs/ directory
-    fetch(`songs/${songFile}`)
-      .then(response => {
-        if (!response.ok) throw new Error("Song file not found");
-        return response.text();
-      })
-      .then(text => parseAndRender(text))
-      .catch(err => {
-        document.getElementById('title').textContent = "Error Loading Song";
-        document.getElementById('song-body').textContent = `Could not load songs/${songFile}. Check your file name in GitHub!`;
-      });
+    const lines = rawText.split('\n');
+    let chordLine = null;
 
-    function parseAndRender(text) {
-      const container = document.getElementById('song-body');
-      container.innerHTML = '';
-      
-      const lines = text.trim().split('\n');
-      
-      // Parse header metadata if present (# Title, Key: G)
-      let bodyLines = [];
-      lines.forEach(line => {
-        if (line.startsWith('# ')) {
-          document.getElementById('title').textContent = line.replace('# ', '');
-        } else if (line.startsWith('Key:') || line.startsWith('Artist:')) {
-          const currentMeta = document.getElementById('meta').textContent;
-          document.getElementById('meta').textContent = currentMeta ? `${currentMeta} | ${line}` : line;
+    // Helper: Detect if a line consists only of chord names
+    const isChordLine = (line) => {
+      const tokens = line.trim().split(/\s+/);
+      if (tokens.length === 0 || tokens[0] === '') return false;
+      const chordRegex = /^[A-G][b#]?(m|maj|min|dim|aug|sus|[0-9])*/;
+      return tokens.every(token => chordRegex.test(token));
+    };
+
+    lines.forEach(line => {
+      // Handle metadata headers
+      if (line.startsWith('# ')) {
+        document.getElementById('title').textContent = line.replace('# ', '');
+        return;
+      }
+
+      // Check for bracketed ChordPro vs Traditional Chords-Over-Lyrics
+      if (line.includes('[') && line.includes(']')) {
+        renderChordProLine(line, container);
+      } else if (isChordLine(line)) {
+        chordLine = line; // Save chord line for the upcoming lyric line
+      } else {
+        if (chordLine) {
+          renderTwoLinePair(chordLine, line, container);
+          chordLine = null;
         } else {
-          bodyLines.push(line);
+          renderPlainLine(line, container);
         }
-      });
+      }
+    });
+  }
 
-      // Render ChordPro lines
-      bodyLines.forEach(lineText => {
-        const lineDiv = document.createElement('div');
-        lineDiv.className = 'line';
-        
-        const regex = /(?:\[([^\]]+)\])?([^\[]*)/g;
-        let match;
+  // Render traditional chords positioned directly over text
+  function renderTwoLinePair(chords, lyrics, container) {
+    const lineDiv = document.createElement('div');
+    lineDiv.className = 'line';
 
-        while ((match = regex.exec(lineText)) !== null) {
-          if (!match[0]) break;
-          const chord = match[1] || '';
-          const lyric = match[2] || '';
+    let i = 0;
+    while (i < lyrics.length || i < chords.length) {
+      let chordSegment = '';
+      let lyricChar = lyrics[i] || ' ';
 
-          const pairDiv = document.createElement('div');
-          pairDiv.className = 'pair';
-
-          const chordSpan = document.createElement('span');
-          chordSpan.className = 'chord';
-          chordSpan.textContent = chord;
-
-          const lyricSpan = document.createElement('span');
-          lyricSpan.className = 'lyric';
-          lyricSpan.textContent = lyric;
-
-          pairDiv.appendChild(chordSpan);
-          pairDiv.appendChild(lyricSpan);
-          lineDiv.appendChild(pairDiv);
+      // Find chord at position
+      if (chords[i] && chords[i] !== ' ') {
+        let j = i;
+        while (j < chords.length && chords[j] !== ' ') {
+          chordSegment += chords[j];
+          j++;
         }
-        container.appendChild(lineDiv);
-      });
+      }
+
+      const pairDiv = document.createElement('div');
+      pairDiv.className = 'pair';
+
+      const chordSpan = document.createElement('span');
+      chordSpan.className = 'chord';
+      chordSpan.textContent = chordSegment;
+
+      const lyricSpan = document.createElement('span');
+      lyricSpan.className = 'lyric';
+      lyricSpan.textContent = lyricChar;
+
+      pairDiv.appendChild(chordSpan);
+      pairDiv.appendChild(lyricSpan);
+      lineDiv.appendChild(pairDiv);
+      i++;
     }
-  </script>
-</body>
-</html>
+    container.appendChild(lineDiv);
+  }
+
+  function renderPlainLine(text, container) {
+    const lineDiv = document.createElement('div');
+    lineDiv.className = 'line';
+    lineDiv.textContent = text;
+    container.appendChild(lineDiv);
+  }
+
+  function renderChordProLine(lineText, container) {
+    const lineDiv = document.createElement('div');
+    lineDiv.className = 'line';
+    const regex = /(?:\[([^\]]+)\])?([^\[]*)/g;
+    let match;
+
+    while ((match = regex.exec(lineText)) !== null) {
+      if (!match[0]) break;
+      const pairDiv = document.createElement('div');
+      pairDiv.className = 'pair';
+
+      const chordSpan = document.createElement('span');
+      chordSpan.className = 'chord';
+      chordSpan.textContent = match[1] || '';
+
+      const lyricSpan = document.createElement('span');
+      lyricSpan.className = 'lyric';
+      lyricSpan.textContent = match[2] || '';
+
+      pairDiv.appendChild(chordSpan);
+      pairDiv.appendChild(lyricSpan);
+      lineDiv.appendChild(pairDiv);
+    }
+    container.appendChild(lineDiv);
+  }
+</script>
