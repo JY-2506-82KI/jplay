@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Songbook</title>
+  <style>
+    :root {
+      --bg: #121212;
+      --text: #e0e0e0;
+      --chord: #4fc3f7;
+      --meta: #b0bec5;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 16px;
+      line-height: 1.5;
+    }
+    h1 { margin: 0 0 4px 0; font-size: 1.8rem; color: #fff; }
+    .meta { color: var(--meta); font-size: 0.9rem; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+    .song-body { font-family: "Courier New", Courier, monospace; font-size: 1.1rem; }
+    .line { display: flex; flex-wrap: wrap; margin-bottom: 8px; }
+    .pair { display: inline-flex; flex-direction: column; align-items: flex-start; margin-right: 2px; }
+    .chord { color: var(--chord); font-weight: bold; font-size: 0.95rem; min-height: 1.2em; }
+    .lyric { white-space: pre; }
+  </style>
+</head>
+<body>
+
+  <div id="song">
+    <h1 id="title">Wagon Wheel</h1>
+    <div class="meta" id="meta">Key: G | Capo: 2nd Fret</div>
+    <div class="song-body" id="song-body"></div>
+  </div>
+
+  <script>
+    // Keep phone screen awake while viewing
+    if ('wakeLock' in navigator) {
+      navigator.wakeLock.request('screen').catch(() => {});
+    }
+
+    // Sample ChordPro Song Content
+    const chordproData = `
+[G]Heading down south to the [D]land of the pines
+I'm [Em]thumbin' my way into [C]North Caroline
+[G]Staring up the road and [D]pray to God I see [C]headlights
+`;
+
+    // Parse ChordPro and render chords directly above lyrics
+    function renderChordPro(text) {
+      const container = document.getElementById('song-body');
+      container.innerHTML = '';
+      const lines = text.trim().split('\n');
+
+      lines.forEach(lineText => {
+        const lineDiv = document.createElement('div');
+        lineDiv.className = 'line';
+        
+        // Match [Chord] followed by lyrics
+        const regex = /(?:\[([^\]]+)\])?([^\[]*)/g;
+        let match;
+
+        while ((match = regex.exec(lineText)) !== null) {
+          if (!match[0]) break;
+          const chord = match[1] || '';
+          const lyric = match[2] || '';
+
+          const pairDiv = document.createElement('div');
+          pairDiv.className = 'pair';
+
+          const chordSpan = document.createElement('span');
+          chordSpan.className = 'chord';
+          chordSpan.textContent = chord;
+
+          const lyricSpan = document.createElement('span');
+          lyricSpan.className = 'lyric';
+          lyricSpan.textContent = lyric;
+
+          pairDiv.appendChild(chordSpan);
+          pairDiv.appendChild(lyricSpan);
+          lineDiv.appendChild(pairDiv);
+        }
+        container.appendChild(lineDiv);
+      });
+    }
+
+    renderChordPro(chordproData);
+  </script>
+</body>
+</html>
