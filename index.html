@@ -20,9 +20,21 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       margin: 0;
       padding: 16px;
-      line-height: 1.5;
+      line-height: 1.6;
     }
-    .container { max-width: 650px; margin: 0 auto; }
+    .container { max-width: 700px; margin: 0 auto; }
+    
+    /* Logo styling */
+    .logo-container {
+      text-align: center;
+      margin-bottom: 20px;
+      margin-top: 10px;
+    }
+    .logo-container img {
+      max-height: 65px;
+      width: auto;
+    }
+
     h1 { margin: 0 0 8px 0; font-size: 1.8rem; color: #111; }
     .meta-line { color: var(--meta); font-size: 0.95rem; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
     
@@ -38,10 +50,7 @@
       box-sizing: border-box;
       margin-bottom: 16px;
     }
-    .search-box:focus {
-      outline: none;
-      border-color: var(--chord);
-    }
+    .search-box:focus { outline: none; border-color: var(--chord); }
     .song-list { display: flex; flex-direction: column; gap: 8px; }
     .song-card {
       background: var(--card-bg);
@@ -73,10 +82,12 @@
       box-shadow: var(--shadow);
     }
     .btn:active { background: #e9ecef; }
-    .song-body { font-family: "Courier New", Courier, monospace; font-size: 1.1rem; }
-    .line { display: flex; flex-wrap: wrap; margin-bottom: 6px; }
-    .pair { display: inline-flex; flex-direction: column; align-items: flex-start; margin-right: 2px; }
-    .chord { color: var(--chord); font-weight: bold; font-size: 0.95rem; min-height: 1.2em; }
+
+    /* Clean ChordPro Line Layout */
+    .song-body { font-family: "Courier New", Courier, monospace; font-size: 1.1rem; white-space: pre-wrap; }
+    .line { display: flex; flex-wrap: wrap; margin-bottom: 12px; align-items: flex-end; }
+    .chunk { display: inline-flex; flex-direction: column; margin-right: 4px; vertical-align: bottom; }
+    .chord { color: var(--chord); font-weight: bold; font-size: 0.9rem; white-space: nowrap; height: 1.3em; }
     .lyric { white-space: pre; }
     .error-msg { color: #d32f2f; background: #ffebee; padding: 12px; border-radius: 6px; border: 1px solid #ffcdd2; }
   </style>
@@ -85,7 +96,10 @@
   <div class="container">
     <!-- INDEX VIEW -->
     <div id="index-view" style="display: none;">
-      <h1>Digital Songbook</h1>
+      <div class="logo-container">
+        <!-- Google Drive Direct Image Link -->
+        <img src="https://lh3.googleusercontent.com/d/1pv3LbDrEoTGGdIAnQAfby59z7n2FtYnV" alt="Songbook Logo" onerror="this.onerror=null; this.src='https://drive.google.com/uc?export=view&id=1pv3LbDrEoTGGdIAnQAfby59z7n2FtYnV';">
+      </div>
       <input type="text" id="search" class="search-box" placeholder="Search artist or title..." oninput="filterSongs()">
       <div id="song-list" class="song-list"></div>
     </div>
@@ -108,7 +122,6 @@
 
     let songCatalog = [];
 
-    // Helper: Convert raw filename (crazy-eddies-last-hurrah.txt) to clean title if metadata is missing
     function cleanFilename(filename) {
       return filename
         .replace(/\.txt$/i, '')
@@ -116,7 +129,6 @@
         .replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
     }
 
-    // App Router
     window.addEventListener('DOMContentLoaded', initApp);
     window.addEventListener('popstate', initApp);
 
@@ -140,7 +152,6 @@
       initApp();
     }
 
-    // Fetch catalog and build menu
     async function loadIndex() {
       const listContainer = document.getElementById('song-list');
       listContainer.innerHTML = '<div>Loading song catalog...</div>';
@@ -192,7 +203,7 @@
       items.forEach(item => {
         const a = document.createElement('a');
         a.className = 'song-card';
-        a.textContent = item.displayName; // Shows ONLY "Artist - Song Name"
+        a.textContent = item.displayName;
         a.href = `?song=${encodeURIComponent(item.file)}`;
         a.onclick = (e) => {
           e.preventDefault();
@@ -209,7 +220,6 @@
       renderSongList(filtered);
     }
 
-    // Load and render song
     async function loadSong(file) {
       document.getElementById('title').textContent = "Loading...";
       document.getElementById('meta').textContent = "";
@@ -234,39 +244,18 @@
       let title = '';
       let artist = '';
       let key = '';
-      let pendingChords = null;
-
-      const chordLineRegex = /^\s*([A-G][b#]?(m|maj|min|dim|aug|sus|[0-9])*\s*)+$/;
 
       lines.forEach(line => {
         const trimmed = line.trim();
 
-        // Metadata extraction
         if (trimmed.startsWith('# ')) { title = trimmed.replace('# ', ''); return; }
         if (trimmed.startsWith('Title:')) { title = trimmed.replace('Title:', '').trim(); return; }
         if (trimmed.startsWith('Artist:')) { artist = trimmed.replace('Artist:', '').trim(); return; }
         if (trimmed.startsWith('Key:')) { key = trimmed.replace('Key:', '').trim(); return; }
 
-        // Render line logic
-        if (line.includes('[') && line.includes(']')) {
-          if (pendingChords) { renderPlain(pendingChords, container); pendingChords = null; }
-          renderBracketed(line, container);
-        } else if (chordLineRegex.test(line) && trimmed.length > 0) {
-          if (pendingChords) renderPlain(pendingChords, container);
-          pendingChords = line;
-        } else {
-          if (pendingChords) {
-            renderChordLyricPair(pendingChords, line, container);
-            pendingChords = null;
-          } else {
-            renderPlain(line, container);
-          }
-        }
+        renderLine(line, container);
       });
 
-      if (pendingChords) renderPlain(pendingChords, container);
-
-      // Set page headers
       document.getElementById('title').textContent = title || cleanFilename(file);
       
       let metaText = [];
@@ -275,16 +264,35 @@
       document.getElementById('meta').textContent = metaText.join(' | ');
     }
 
-    function renderBracketed(lineText, container) {
+    function renderLine(lineText, container) {
       const lineDiv = document.createElement('div');
       lineDiv.className = 'line';
-      const regex = /(?:\[([^\]]+)\])?([^\[]*)/g;
+
+      const regex = /\[([^\]]+)\]([^\[]*)/g;
       let match;
+      let hasMatches = false;
+
+      if (!lineText.startsWith('[') && lineText.length > 0) {
+        const firstBracket = lineText.indexOf('[');
+        const leadingText = firstBracket === -1 ? lineText : lineText.substring(0, firstBracket);
+        if (leadingText) {
+          const chunk = document.createElement('div');
+          chunk.className = 'chunk';
+          const chordSpan = document.createElement('span');
+          chordSpan.className = 'chord';
+          const lyricSpan = document.createElement('span');
+          lyricSpan.className = 'lyric';
+          lyricSpan.textContent = leadingText;
+          chunk.appendChild(chordSpan);
+          chunk.appendChild(lyricSpan);
+          lineDiv.appendChild(chunk);
+        }
+      }
 
       while ((match = regex.exec(lineText)) !== null) {
-        if (!match[0]) break;
-        const pairDiv = document.createElement('div');
-        pairDiv.className = 'pair';
+        hasMatches = true;
+        const chunk = document.createElement('div');
+        chunk.className = 'chunk';
 
         const chordSpan = document.createElement('span');
         chordSpan.className = 'chord';
@@ -294,52 +302,15 @@
         lyricSpan.className = 'lyric';
         lyricSpan.textContent = match[2] || '';
 
-        pairDiv.appendChild(chordSpan);
-        pairDiv.appendChild(lyricSpan);
-        lineDiv.appendChild(pairDiv);
+        chunk.appendChild(chordSpan);
+        chunk.appendChild(lyricSpan);
+        lineDiv.appendChild(chunk);
       }
-      container.appendChild(lineDiv);
-    }
 
-    function renderChordLyricPair(chords, lyrics, container) {
-      const lineDiv = document.createElement('div');
-      lineDiv.className = 'line';
-      const maxLen = Math.max(chords.length, lyrics.length);
-
-      let i = 0;
-      while (i < maxLen) {
-        let chordSegment = '';
-        if (chords[i] && chords[i] !== ' ') {
-          let j = i;
-          while (j < chords.length && chords[j] !== ' ') {
-            chordSegment += chords[j];
-            j++;
-          }
-        }
-
-        const pairDiv = document.createElement('div');
-        pairDiv.className = 'pair';
-
-        const chordSpan = document.createElement('span');
-        chordSpan.className = 'chord';
-        chordSpan.textContent = chordSegment;
-
-        const lyricSpan = document.createElement('span');
-        lyricSpan.className = 'lyric';
-        lyricSpan.textContent = lyrics[i] || ' ';
-
-        pairDiv.appendChild(chordSpan);
-        pairDiv.appendChild(lyricSpan);
-        lineDiv.appendChild(pairDiv);
-        i++;
+      if (!hasMatches) {
+        lineDiv.textContent = lineText;
       }
-      container.appendChild(lineDiv);
-    }
 
-    function renderPlain(text, container) {
-      const lineDiv = document.createElement('div');
-      lineDiv.className = 'line';
-      lineDiv.textContent = text;
       container.appendChild(lineDiv);
     }
   </script>
