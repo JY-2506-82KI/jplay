@@ -1,12 +1,8 @@
 # Amie
 Artist: Pure Prairie League
 
-[Intro]
-[A]
-[A]  [G][D]  [A]  [G][D]
-
 [Verse 1]
-[A]I can see why [G]you think [D]you be[A]ong to me [G][D]
+[A]I can see why [G]you think [D]you be[A]long to me [G][D]
 I [A]never tried to [G]make you [D]think, or [A]let you see one thing for your [D]self
 But now you're [C]off with someone else and i'm a[D]lone
 You see I thought [C]that I might keep you for my [E] own
