@@ -2,123 +2,370 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Digital Songbook</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Digital Live Songbook</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root {
-      --bg: #121212;
-      --text: #e0e0e0;
-      --chord: #4fc3f7;
-      --meta: #b0bec5;
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --text-color: #f8fafc;
+      --chord-color: #38bdf8;
+      --meta-color: #94a3b8;
+      --accent-color: #f59e0b;
     }
     body {
-      background-color: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      margin: 0;
-      padding: 16px;
-      line-height: 1.5;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
     }
-    h1 { margin: 0 0 4px 0; font-size: 1.8rem; color: #fff; }
-    .meta { color: var(--meta); font-size: 0.9rem; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 8px; }
-    .song-body { font-family: "Courier New", Courier, monospace; font-size: 1.1rem; white-space: pre-wrap; }
-    .line { display: flex; flex-wrap: wrap; margin-bottom: 8px; }
-    .pair { display: inline-flex; flex-direction: column; align-items: flex-start; margin-right: 2px; }
-    .chord { color: var(--chord); font-weight: bold; font-size: 0.95rem; min-height: 1.2em; }
-    .lyric { white-space: pre; }
-    .error-msg { color: #ff5252; background: #2a1212; padding: 12px; border-radius: 6px; }
+    .mono-font {
+      font-family: "ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "Liberation Mono", "Courier New", monospace;
+    }
+    /* Song sheet alignment */
+    .song-line {
+      display: flex;
+      flex-wrap: wrap;
+      margin-bottom: 0.5rem;
+      line-height: 1.2;
+    }
+    .chord-lyric-pair {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-start;
+      margin-right: 0px;
+    }
+    .chord-slot {
+      color: var(--chord-color);
+      font-weight: 700;
+      font-size: 1rem;
+      min-height: 1.3em;
+      user-select: none;
+    }
+    .lyric-slot {
+      white-space: pre;
+      font-size: 1.1rem;
+    }
   </style>
 </head>
-<body>
+<body class="min-h-screen flex flex-col antialiased">
 
-  <div id="song">
-    <h1 id="title">Loading Song...</h1>
-    <div class="meta" id="meta"></div>
-    <div class="song-body" id="song-body"></div>
-  </div>
+  <!-- Header Navigation Bar -->
+  <header class="sticky top-0 z-50 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-3 shadow-md">
+    <div class="max-w-4xl mx-auto flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <button id="btn-back" onclick="showIndexView()" class="hidden bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-lg transition-colors flex items-center gap-1.5 text-sm font-medium">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+          Index
+        </button>
+        <h1 id="app-title" class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+          <svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path></svg>
+          <span>Songbook</span>
+        </h1>
+      </div>
 
+      <!-- Toolbar options for active song view -->
+      <div id="song-toolbar" class="hidden flex items-center space-x-2">
+        <div class="bg-slate-800 rounded-lg p-1 flex items-center space-x-1 border border-slate-700">
+          <button onclick="transposeKey(-1)" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 rounded text-amber-400 font-bold active:scale-95 transition-all text-sm">-1</button>
+          <span id="key-display" class="px-2 text-xs font-semibold text-slate-300 min-w-[3rem] text-center">KEY</span>
+          <button onclick="transposeKey(1)" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 rounded text-amber-400 font-bold active:scale-95 transition-all text-sm">+1</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-4xl w-full mx-auto p-4 md:p-6">
+    
+    <!-- 1. INDEX VIEW -->
+    <section id="index-view" class="space-y-4">
+      <div class="relative">
+        <input type="text" id="search-input" oninput="filterSongs()" placeholder="Search title or artist..." 
+               class="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-3 pl-10 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all shadow-inner placeholder-slate-500 text-base">
+        <svg class="w-5 h-5 text-slate-400 absolute left-3 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+      </div>
+
+      <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-400 px-1">
+        <span>Catalog Library</span>
+        <span id="song-count">0 songs</span>
+      </div>
+
+      <div id="song-list" class="grid gap-2.5">
+        <!-- Dynamic list of songs inserted here -->
+      </div>
+    </section>
+
+    <!-- 2. SONG SHEET VIEW -->
+    <section id="song-view" class="hidden space-y-4">
+      <div id="song-header" class="border-b border-slate-800 pb-4">
+        <h2 id="song-title" class="text-2xl md:text-3xl font-extrabold text-white"></h2>
+        <div id="song-meta" class="text-sm text-slate-400 mt-1 flex flex-wrap gap-x-4 gap-y-1"></div>
+      </div>
+
+      <div id="song-body" class="mono-font overflow-x-auto py-2">
+        <!-- Dynamically rendered chord sheet -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- JavaScript Application Logic -->
   <script>
-    // Keep phone screen awake
+    // State Variables
+    let catalog = [];
+    let currentSongRawText = "";
+    let transposeSemitones = 0;
+
+    // Chromatic Musical Scale for Transposing Chords
+    const chromaticScaleSharp = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const chromaticScaleFlat  = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+    // Enable Keep Screen Awake via Wake Lock API
     if ('wakeLock' in navigator) {
       navigator.wakeLock.request('screen').catch(() => {});
     }
 
-    // Get target song from URL parameter (defaults to wagon-wheel.txt or active file)
-    const urlParams = new URLSearchParams(window.location.search);
-    const songFile = urlParams.get('song') || 'crazy-eddies-last-hurrah.txt';
+    // App Initialization
+    window.onload = function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const songParam = urlParams.get('song');
 
-    fetch(`songs/${songFile}`)
-      .then(res => {
-        if (!res.ok) throw new Error(`Could not find "songs/${songFile}" in your repository.`);
-        return res.text();
-      })
-      .then(text => renderSong(text))
-      .catch(err => {
-        document.getElementById('title').textContent = "Unable to Load Song";
-        document.getElementById('song-body').innerHTML = `<div class="error-msg">${err.message}<br><br>Make sure the file exists in your <b>songs/</b> folder!</div>`;
+      // Fetch master song manifest catalog
+      fetch('songs.json')
+        .then(res => res.json())
+        .then(data => {
+          catalog = data;
+          loadCatalogMetadata().then(() => {
+            if (songParam) {
+              loadSongView(songParam);
+            } else {
+              showIndexView();
+            }
+          });
+        })
+        .catch(err => {
+          console.error("Could not load songs.json catalog", err);
+          document.getElementById('song-list').innerHTML = `
+            <div class="bg-red-900/30 border border-red-700/50 rounded-xl p-4 text-red-200 text-sm">
+              <strong>Error loading songs catalog.</strong><br>
+              Make sure <code>songs.json</code> exists in your repository root folder.
+            </div>`;
+        });
+    };
+
+    // Load song files to extract Header Metadata ("Artist - Title")
+    async function loadCatalogMetadata() {
+      const songListEl = document.getElementById('song-list');
+      songListEl.innerHTML = '';
+
+      const promises = catalog.map(async (filename) => {
+        try {
+          const response = await fetch(`songs/${filename}`);
+          if (!response.ok) throw new Error();
+          const text = await response.text();
+          
+          let title = filename.replace(/\.(txt|md)$/, '').replace(/[-_]/g, ' ');
+          let artist = 'Unknown Artist';
+
+          const lines = text.split('\n');
+          lines.forEach(line => {
+            if (line.startsWith('# ')) {
+              title = line.replace('# ', '').trim();
+            } else if (line.toLowerCase().startsWith('artist:')) {
+              artist = line.split(':')[1].trim();
+            }
+          });
+
+          return { filename, title, artist, displayName: `${artist} - ${title}` };
+        } catch {
+          return { filename, title: filename, artist: 'Unknown', displayName: filename };
+        }
       });
 
-    function renderSong(rawText) {
+      catalog = await Promise.all(promises);
+      renderCatalogList(catalog);
+    }
+
+    function renderCatalogList(items) {
+      const songListEl = document.getElementById('song-list');
+      document.getElementById('song-count').textContent = `${items.length} songs`;
+      songListEl.innerHTML = '';
+
+      if (items.length === 0) {
+        songListEl.innerHTML = '<div class="text-slate-500 text-center py-8">No matching songs found</div>';
+        return;
+      }
+
+      items.forEach(item => {
+        const card = document.createElement('a');
+        card.href = `?song=${encodeURIComponent(item.filename)}`;
+        card.onclick = (e) => {
+          e.preventDefault();
+          window.history.pushState({}, '', card.href);
+          loadSongView(item.filename);
+        };
+        card.className = "bg-slate-800/80 hover:bg-slate-700/90 border border-slate-700/60 p-4 rounded-xl flex items-center justify-between transition-all group shadow-sm active:scale-[0.99]";
+        card.innerHTML = `
+          <div class="flex items-center space-x-3">
+            <div class="w-2.5 h-2.5 rounded-full bg-amber-500/80 group-hover:bg-amber-400"></div>
+            <div>
+              <div class="font-bold text-white text-base md:text-lg group-hover:text-amber-400 transition-colors">${item.displayName}</div>
+              <div class="text-xs text-slate-400 mt-0.5">${item.filename}</div>
+            </div>
+          </div>
+          <svg class="w-5 h-5 text-slate-500 group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+        `;
+        songListEl.appendChild(card);
+      });
+    }
+
+    function filterSongs() {
+      const query = document.getElementById('search-input').value.toLowerCase();
+      const filtered = catalog.filter(item => 
+        item.displayName.toLowerCase().includes(query) || 
+        item.filename.toLowerCase().includes(query)
+      );
+      renderCatalogList(filtered);
+    }
+
+    function showIndexView() {
+      window.history.pushState({}, '', window.location.pathname);
+      document.getElementById('index-view').classList.remove('hidden');
+      document.getElementById('song-view').classList.add('hidden');
+      document.getElementById('btn-back').classList.add('hidden');
+      document.getElementById('song-toolbar').classList.add('hidden');
+      document.getElementById('app-title').querySelector('span').textContent = 'Songbook';
+    }
+
+    function loadSongView(filename) {
+      document.getElementById('index-view').classList.add('hidden');
+      document.getElementById('song-view').classList.remove('hidden');
+      document.getElementById('btn-back').classList.remove('hidden');
+      document.getElementById('song-toolbar').classList.remove('hidden');
+
+      transposeSemitones = 0;
+      updateKeyDisplay();
+
+      fetch(`songs/${filename}`)
+        .then(res => {
+          if (!res.ok) throw new Error(`File songs/${filename} not found`);
+          return res.text();
+        })
+        .then(text => {
+          currentSongRawText = text;
+          renderSongSheet();
+        })
+        .catch(err => {
+          document.getElementById('song-title').textContent = "Error Loading Song";
+          document.getElementById('song-body').innerHTML = `<div class="bg-red-900/30 text-red-300 p-4 rounded-xl border border-red-700/50">${err.message}</div>`;
+        });
+    }
+
+    function transposeKey(delta) {
+      transposeSemitones += delta;
+      updateKeyDisplay();
+      renderSongSheet();
+    }
+
+    function updateKeyDisplay() {
+      const sign = transposeSemitones > 0 ? `+${transposeSemitones}` : `${transposeSemitones}`;
+      document.getElementById('key-display').textContent = transposeSemitones === 0 ? 'ORIG' : `${sign} ST`;
+    }
+
+    // Transpose single Chord String (e.g. "G#m7" -> "Am7")
+    function transposeChord(chord, semitones) {
+      if (!chord || semitones === 0) return chord;
+
+      return chord.replace(/[A-G][b#]?/g, match => {
+        let isFlat = match.includes('b');
+        let scale = isFlat ? chromaticScaleFlat : chromaticScaleSharp;
+        let index = scale.indexOf(match);
+
+        if (index === -1) {
+          scale = isFlat ? chromaticScaleSharp : chromaticScaleFlat;
+          index = scale.indexOf(match);
+        }
+        if (index === -1) return match;
+
+        let newIndex = (index + semitones) % 12;
+        if (newIndex < 0) newIndex += 12;
+        return scale[newIndex];
+      });
+    }
+
+    // Main Parsing & Rendering Engine
+    function renderSongSheet() {
       const container = document.getElementById('song-body');
       container.innerHTML = '';
 
-      const lines = rawText.split('\n');
-      let pendingChords = null;
+      const lines = currentSongRawText.split('\n');
+      let title = "Untitled Song";
+      let metaDetails = [];
+      let pendingChordLine = null;
 
-      // Regex to identify lines that contain only chord symbols
       const chordLineRegex = /^\s*([A-G][b#]?(m|maj|min|dim|aug|sus|[0-9])*\s*)+$/;
 
       lines.forEach(line => {
-        // Parse title headers
+        // Metadata Parsing
         if (line.startsWith('# ')) {
-          document.getElementById('title').textContent = line.replace('# ', '');
+          title = line.replace('# ', '').trim();
+          return;
+        } else if (line.toLowerCase().startsWith('artist:') || line.toLowerCase().startsWith('key:')) {
+          metaDetails.push(line.trim());
           return;
         }
 
-        // 1. Bracketed ChordPro lines ([G]Heading [D]down...)
+        // Bracketed ChordPro Lines ([G]Lyrics)
         if (line.includes('[') && line.includes(']')) {
-          if (pendingChords) { renderPlain(pendingChords, container); pendingChords = null; }
-          renderBracketed(line, container);
-        } 
-        // 2. Lines consisting only of chords
+          if (pendingChordLine) { renderPlainLine(pendingChordLine, container); pendingChordLine = null; }
+          renderBracketedLine(line, container);
+        }
+        // Traditional Chord-Only Lines
         else if (chordLineRegex.test(line) && line.trim().length > 0) {
-          if (pendingChords) { renderPlain(pendingChords, container); }
-          pendingChords = line;
-        } 
-        // 3. Lyrics immediately following a chord line
+          if (pendingChordLine) { renderPlainLine(pendingChordLine, container); }
+          pendingChordLine = line;
+        }
+        // Lyric Lines or Plain Text
         else {
-          if (pendingChords) {
-            renderChordLyricPair(pendingChords, line, container);
-            pendingChords = null;
+          if (pendingChordLine) {
+            renderAlignedPair(pendingChordLine, line, container);
+            pendingChordLine = null;
           } else {
-            renderPlain(line, container);
+            renderPlainLine(line, container);
           }
         }
       });
 
-      if (pendingChords) {
-        renderPlain(pendingChords, container);
-      }
+      if (pendingChordLine) renderPlainLine(pendingChordLine, container);
+
+      document.getElementById('song-title').textContent = title;
+      document.getElementById('app-title').querySelector('span').textContent = title;
+      document.getElementById('song-meta').innerHTML = metaDetails.map(m => `<span>${m}</span>`).join('<span class="text-slate-600">•</span>');
     }
 
-    function renderBracketed(lineText, container) {
+    function renderBracketedLine(lineText, container) {
       const lineDiv = document.createElement('div');
-      lineDiv.className = 'line';
+      lineDiv.className = 'song-line';
       const regex = /(?:\[([^\]]+)\])?([^\[]*)/g;
       let match;
 
       while ((match = regex.exec(lineText)) !== null) {
         if (!match[0]) break;
+        const rawChord = match[1] || '';
+        const lyric = match[2] || '';
+
         const pairDiv = document.createElement('div');
-        pairDiv.className = 'pair';
+        pairDiv.className = 'chord-lyric-pair';
 
         const chordSpan = document.createElement('span');
-        chordSpan.className = 'chord';
-        chordSpan.textContent = match[1] || '';
+        chordSpan.className = 'chord-slot';
+        chordSpan.textContent = transposeChord(rawChord, transposeSemitones);
 
         const lyricSpan = document.createElement('span');
-        lyricSpan.className = 'lyric';
-        lyricSpan.textContent = match[2] || '';
+        lyricSpan.className = 'lyric-slot';
+        lyricSpan.textContent = lyric;
 
         pairDiv.appendChild(chordSpan);
         pairDiv.appendChild(lyricSpan);
@@ -127,9 +374,9 @@
       container.appendChild(lineDiv);
     }
 
-    function renderChordLyricPair(chords, lyrics, container) {
+    function renderAlignedPair(chords, lyrics, container) {
       const lineDiv = document.createElement('div');
-      lineDiv.className = 'line';
+      lineDiv.className = 'song-line';
       const maxLen = Math.max(chords.length, lyrics.length);
 
       let i = 0;
@@ -144,14 +391,14 @@
         }
 
         const pairDiv = document.createElement('div');
-        pairDiv.className = 'pair';
+        pairDiv.className = 'chord-lyric-pair';
 
         const chordSpan = document.createElement('span');
-        chordSpan.className = 'chord';
-        chordSpan.textContent = chordSegment;
+        chordSpan.className = 'chord-slot';
+        chordSpan.textContent = transposeChord(chordSegment, transposeSemitones);
 
         const lyricSpan = document.createElement('span');
-        lyricSpan.className = 'lyric';
+        lyricSpan.className = 'lyric-slot';
         lyricSpan.textContent = lyrics[i] || ' ';
 
         pairDiv.appendChild(chordSpan);
@@ -162,9 +409,9 @@
       container.appendChild(lineDiv);
     }
 
-    function renderPlain(text, container) {
+    function renderPlainLine(text, container) {
       const lineDiv = document.createElement('div');
-      lineDiv.className = 'line';
+      lineDiv.className = 'song-line lyric-slot py-0.5 text-slate-300';
       lineDiv.textContent = text;
       container.appendChild(lineDiv);
     }
