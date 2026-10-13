@@ -24,21 +24,36 @@
     }
     .container { max-width: 700px; margin: 0 auto; }
     
-    /* Logo styling - Clean circular crop */
+    /* Logo styling - Index */
     .logo-container {
       text-align: center;
       margin-bottom: 24px;
       margin-top: 12px;
     }
     .logo-container img {
-      max-height: 150px; /* Adjust size as desired */
+      max-height: 150px;
       width: auto;
-      border-radius: 50%; /* Crops the square JPEG into a perfect circle */
+      border-radius: 50%;
       display: inline-block;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.08); /* Adds a subtle depth shadow */
+      box-shadow: 0 4px 8px rgba(0,0,0,0.08);
     }
 
-    h1 { margin: 0 0 8px 0; font-size: 1.8rem; color: #111; }
+    /* Small Logo styling - Song View Header */
+    .song-header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .song-logo-small {
+      height: 40px;
+      width: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    h1 { margin: 0 0 4px 0; font-size: 1.8rem; color: #111; }
     .meta-line { color: var(--meta); font-size: 0.95rem; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
     
     /* Search & Menu UI */
@@ -71,20 +86,23 @@
     }
     .song-card:active { background: #e9ecef; }
 
-    /* Song View UI */
-    .nav-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    /* Song View UI & Controls */
+    .nav-bar { display: flex; gap: 8px; align-items: center; }
     .btn {
       background: var(--card-bg);
       color: var(--text);
       border: 1px solid #ced4da;
-      padding: 8px 14px;
+      padding: 8px 12px;
       border-radius: 6px;
       text-decoration: none;
       font-size: 0.9rem;
       cursor: pointer;
       box-shadow: var(--shadow);
+      font-weight: 500;
     }
     .btn:active { background: #e9ecef; }
+    .transpose-group { display: flex; align-items: center; gap: 4px; }
+    .transpose-label { font-size: 0.85rem; color: var(--meta); margin-right: 2px; }
 
     /* Clean ChordPro Line Layout */
     .song-body { font-family: "Courier New", Courier, monospace; font-size: 1.1rem; white-space: pre-wrap; }
@@ -100,7 +118,6 @@
     <!-- INDEX VIEW -->
     <div id="index-view" style="display: none;">
       <div class="logo-container">
-        <!-- Google Drive Direct Image Link -->
         <img src="https://lh3.googleusercontent.com/d/1Esq9lNLNahze9Y9-orbyvXcBUrAKR1WL" alt="Songbook Logo" onerror="this.onerror=null; this.src='https://drive.google.com/uc?export=view&id=1Esq9lNLNahze9Y9-orbyvXcBUrAKR1WL';">
       </div>
       <input type="text" id="search" class="search-box" placeholder="Search artist or title..." oninput="filterSongs()">
@@ -109,8 +126,16 @@
 
     <!-- SONG VIEW -->
     <div id="song-view" style="display: none;">
-      <div class="nav-bar">
-        <button class="btn" onclick="showIndex()">← Back to Index</button>
+      <div class="song-header-top">
+        <div class="nav-bar">
+          <button class="btn" onclick="showIndex()">← Index</button>
+          <div class="transpose-group">
+            <span class="transpose-label">Key:</span>
+            <button class="btn" onclick="transpose(-1)">-1</button>
+            <button class="btn" onclick="transpose(1)">+1</button>
+          </div>
+        </div>
+        <img src="https://lh3.googleusercontent.com/d/1Esq9lNLNahze9Y9-orbyvXcBUrAKR1WL" class="song-logo-small" alt="Logo" onerror="this.onerror=null; this.src='https://drive.google.com/uc?export=view&id=1Esq9lNLNahze9Y9-orbyvXcBUrAKR1WL';">
       </div>
       <h1 id="title">Loading...</h1>
       <div class="meta-line" id="meta"></div>
@@ -124,6 +149,12 @@
     }
 
     let songCatalog = [];
+    let currentRawText = '';
+    let currentFile = '';
+    let currentTransposeSemitones = 0;
+
+    const sharps = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    const flats  = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
 
     function cleanFilename(filename) {
       return filename
@@ -138,11 +169,13 @@
     function initApp() {
       const urlParams = new URLSearchParams(window.location.search);
       const songParam = urlParams.get('song');
+      const tParam = parseInt(urlParams.get('t') || '0', 10);
+      currentTransposeSemitones = isNaN(tParam) ? 0 : tParam;
 
       if (songParam) {
         document.getElementById('index-view').style.display = 'none';
         document.getElementById('song-view').style.display = 'block';
-        loadSong(songParam);
+        loadSong(songParam, false);
       } else {
         document.getElementById('song-view').style.display = 'none';
         document.getElementById('index-view').style.display = 'block';
@@ -223,7 +256,10 @@
       renderSongList(filtered);
     }
 
-    async function loadSong(file) {
+    async function loadSong(file, resetTranspose = true) {
+      currentFile = file;
+      if (resetTranspose) currentTransposeSemitones = 0;
+
       document.getElementById('title').textContent = "Loading...";
       document.getElementById('meta').textContent = "";
       document.getElementById('song-body').innerHTML = "";
@@ -231,15 +267,50 @@
       try {
         const res = await fetch(`songs/${file}`);
         if (!res.ok) throw new Error(`Could not load songs/${file}`);
-        const text = await res.text();
-        parseAndRenderSong(text, file);
+        currentRawText = await res.text();
+        parseAndRenderSong(currentRawText, file, currentTransposeSemitones);
       } catch (err) {
         document.getElementById('title').textContent = "Error";
         document.getElementById('song-body').innerHTML = `<div class="error-msg">${err.message}</div>`;
       }
     }
 
-    function parseAndRenderSong(rawText, file) {
+    function transpose(amount) {
+      currentTransposeSemitones += amount;
+      const url = new URL(window.location);
+      url.searchParams.set('song', currentFile);
+      if (currentTransposeSemitones !== 0) {
+        url.searchParams.set('t', currentTransposeSemitones);
+      } else {
+        url.searchParams.delete('t');
+      }
+      history.pushState({}, '', url);
+      parseAndRenderSong(currentRawText, currentFile, currentTransposeSemitones);
+    }
+
+    function transposeChord(chord, semitones) {
+      if (!semitones) return chord;
+      // Match root note (e.g., F#, Bb, C) plus optional modifiers (m, 7, maj, etc.)
+      const match = chord.match(/^([A-G][b#]?)(.*)$/);
+      if (!match) return chord;
+
+      const root = match[1];
+      const suffix = match[2];
+
+      let idx = sharps.indexOf(root);
+      if (idx === -1) idx = flats.indexOf(root);
+      if (idx === -1) return chord;
+
+      let newIdx = (idx + semitones) % 12;
+      if (newIdx < 0) newIdx += 12;
+
+      // Prefer flats if original had flat, otherwise sharp
+      const useFlats = root.includes('b');
+      const newRoot = useFlats ? flats[newIdx] : sharps[newIdx];
+      return newRoot + suffix;
+    }
+
+    function parseAndRenderSong(rawText, file, semitones) {
       const container = document.getElementById('song-body');
       container.innerHTML = '';
 
@@ -256,18 +327,26 @@
         if (trimmed.startsWith('Artist:')) { artist = trimmed.replace('Artist:', '').trim(); return; }
         if (trimmed.startsWith('Key:')) { key = trimmed.replace('Key:', '').trim(); return; }
 
-        renderLine(line, container);
+        renderLine(line, container, semitones);
       });
 
       document.getElementById('title').textContent = title || cleanFilename(file);
       
       let metaText = [];
       if (artist) metaText.push(`Artist: ${artist}`);
-      if (key) metaText.push(`Key: ${key}`);
+      if (key) {
+        let displayKey = key;
+        if (semitones !== 0) {
+          displayKey = `${key} (Transposed: ${transposeChord(key, semitones)})`;
+        }
+        metaText.push(`Key: ${displayKey}`);
+      } else if (semitones !== 0) {
+        metaText.push(`Transpose: ${semitones > 0 ? '+' + semitones : semitones}`);
+      }
       document.getElementById('meta').textContent = metaText.join(' | ');
     }
 
-    function renderLine(lineText, container) {
+    function renderLine(lineText, container, semitones) {
       const lineDiv = document.createElement('div');
       lineDiv.className = 'line';
 
@@ -299,7 +378,7 @@
 
         const chordSpan = document.createElement('span');
         chordSpan.className = 'chord';
-        chordSpan.textContent = match[1] || '';
+        chordSpan.textContent = transposeChord(match[1] || '', semitones);
 
         const lyricSpan = document.createElement('span');
         lyricSpan.className = 'lyric';
