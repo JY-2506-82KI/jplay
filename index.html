@@ -24,22 +24,17 @@
     }
     .container { max-width: 700px; margin: 0 auto; }
     
-    /* Logo styling */
+    /* Logo styling - No box, clean integration */
     .logo-container {
       text-align: center;
       margin-bottom: 24px;
-      margin-top: 8px;
-      background-color: #f7f5f0; /* Replace with the exact background tint of your JPEG */
-      padding: 16px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow);
+      margin-top: 12px;
     }
     .logo-container img {
-      max-height: 110px;
+      max-height: 140px; /* Adjust this if you want it larger or smaller */
       width: auto;
-      display: block;
-      margin: 0 auto;
+      display: inline-block;
+      mix-blend-mode: multiply; /* Helps blend white/near-white backgrounds */
     }
 
     h1 { margin: 0 0 8px 0; font-size: 1.8rem; color: #111; }
