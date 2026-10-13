@@ -38,19 +38,25 @@
       box-shadow: 0 4px 8px rgba(0,0,0,0.08);
     }
 
-    /* Small Logo styling - Song View Header */
+    /* Song View Header layout */
     .song-header-top {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
       margin-bottom: 16px;
     }
+    .header-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+    }
     .song-logo-small {
-      height: 40px;
-      width: 40px;
+      height: 44px;
+      width: 44px;
       border-radius: 50%;
       object-fit: cover;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
     }
 
     h1 { margin: 0 0 4px 0; font-size: 1.8rem; color: #111; }
@@ -87,7 +93,7 @@
     .song-card:active { background: #e9ecef; }
 
     /* Song View UI & Controls */
-    .nav-bar { display: flex; gap: 8px; align-items: center; }
+    .nav-bar { display: flex; align-items: center; }
     .btn {
       background: var(--card-bg);
       color: var(--text);
@@ -129,13 +135,15 @@
       <div class="song-header-top">
         <div class="nav-bar">
           <button class="btn" onclick="showIndex()">← Index</button>
+        </div>
+        <div class="header-right">
+          <img src="https://lh3.googleusercontent.com/d/1Esq9lNLNahze9Y9-orbyvXcBUrAKR1WL" class="song-logo-small" alt="Logo" onerror="this.onerror=null; this.src='https://drive.google.com/uc?export=view&id=1Esq9lNLNahze9Y9-orbyvXcBUrAKR1WL';">
           <div class="transpose-group">
             <span class="transpose-label">Key:</span>
             <button class="btn" onclick="transpose(-1)">-1</button>
             <button class="btn" onclick="transpose(1)">+1</button>
           </div>
         </div>
-        <img src="https://lh3.googleusercontent.com/d/1Esq9lNLNahze9Y9-orbyvXcBUrAKR1WL" class="song-logo-small" alt="Logo" onerror="this.onerror=null; this.src='https://drive.google.com/uc?export=view&id=1Esq9lNLNahze9Y9-orbyvXcBUrAKR1WL';">
       </div>
       <h1 id="title">Loading...</h1>
       <div class="meta-line" id="meta"></div>
@@ -290,7 +298,6 @@
 
     function transposeChord(chord, semitones) {
       if (!semitones) return chord;
-      // Match root note (e.g., F#, Bb, C) plus optional modifiers (m, 7, maj, etc.)
       const match = chord.match(/^([A-G][b#]?)(.*)$/);
       if (!match) return chord;
 
@@ -304,7 +311,6 @@
       let newIdx = (idx + semitones) % 12;
       if (newIdx < 0) newIdx += 12;
 
-      // Prefer flats if original had flat, otherwise sharp
       const useFlats = root.includes('b');
       const newRoot = useFlats ? flats[newIdx] : sharps[newIdx];
       return newRoot + suffix;
