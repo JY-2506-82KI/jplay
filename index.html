@@ -13,6 +13,7 @@
       --meta: #6c757d;
       --border: #e9ecef;
       --shadow: 0 2px 4px rgba(0,0,0,0.05);
+      --song-font-size: 1.1rem; /* Base dynamic font size */
     }
     body {
       background-color: var(--bg);
@@ -107,14 +108,15 @@
       font-weight: 500;
     }
     .btn:active { background: #e9ecef; }
-    .transpose-group { display: flex; align-items: center; gap: 4px; }
-    .transpose-label { font-size: 0.85rem; color: var(--meta); margin-right: 2px; }
+    .controls-row { display: flex; align-items: center; gap: 6px; }
+    .control-group { display: flex; align-items: center; gap: 4px; }
+    .control-label { font-size: 0.8rem; color: var(--meta); margin-right: 2px; }
 
-    /* Clean ChordPro Line Layout */
-    .song-body { font-family: "Courier New", Courier, monospace; font-size: 1.1rem; white-space: pre-wrap; }
+    /* Clean ChordPro Line Layout with Dynamic Font Scaling */
+    .song-body { font-family: "Courier New", Courier, monospace; font-size: var(--song-font-size); white-space: pre-wrap; }
     .line { display: flex; flex-wrap: wrap; margin-bottom: 12px; align-items: flex-end; }
     .chunk { display: inline-flex; flex-direction: column; margin-right: 4px; vertical-align: bottom; }
-    .chord { color: var(--chord); font-weight: bold; font-size: 0.9rem; white-space: nowrap; height: 1.3em; }
+    .chord { color: var(--chord); font-weight: bold; font-size: calc(var(--song-font-size) * 0.82); white-space: nowrap; height: 1.3em; }
     .lyric { white-space: pre; }
     .error-msg { color: #d32f2f; background: #ffebee; padding: 12px; border-radius: 6px; border: 1px solid #ffcdd2; }
   </style>
@@ -138,10 +140,17 @@
         </div>
         <div class="header-right">
           <img src="https://lh3.googleusercontent.com/d/1Esq9lNLNahze9Y9-orbyvXcBUrAKR1WL" class="song-logo-small" alt="Logo" onerror="this.onerror=null; this.src='https://drive.google.com/uc?export=view&id=1Esq9lNLNahze9Y9-orbyvXcBUrAKR1WL';">
-          <div class="transpose-group">
-            <span class="transpose-label">Key:</span>
-            <button class="btn" onclick="transpose(-1)">-1</button>
-            <button class="btn" onclick="transpose(1)">+1</button>
+          <div class="controls-row">
+            <div class="control-group">
+              <span class="control-label">Size:</span>
+              <button class="btn" onclick="adjustFontSize(-0.1)">A-</button>
+              <button class="btn" onclick="adjustFontSize(0.1)">A+</button>
+            </div>
+            <div class="control-group">
+              <span class="control-label">Key:</span>
+              <button class="btn" onclick="transpose(-1)">-1</button>
+              <button class="btn" onclick="transpose(1)">+1</button>
+            </div>
           </div>
         </div>
       </div>
@@ -160,6 +169,7 @@
     let currentRawText = '';
     let currentFile = '';
     let currentTransposeSemitones = 0;
+    let currentFontSize = 1.1; // Default rem
 
     const sharps = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
     const flats  = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
@@ -178,7 +188,11 @@
       const urlParams = new URLSearchParams(window.location.search);
       const songParam = urlParams.get('song');
       const tParam = parseInt(urlParams.get('t') || '0', 10);
+      const fParam = parseFloat(urlParams.get('f') || '1.1');
+      
       currentTransposeSemitones = isNaN(tParam) ? 0 : tParam;
+      currentFontSize = isNaN(fParam) ? 1.1 : fParam;
+      document.documentElement.style.setProperty('--song-font-size', currentFontSize + 'rem');
 
       if (songParam) {
         document.getElementById('index-view').style.display = 'none';
@@ -264,9 +278,12 @@
       renderSongList(filtered);
     }
 
-    async function loadSong(file, resetTranspose = true) {
+    async function loadSong(file, resetParams = true) {
       currentFile = file;
-      if (resetTranspose) currentTransposeSemitones = 0;
+      if (resetParams) {
+        currentTransposeSemitones = 0;
+        currentFontSize = 1.1;
+      }
 
       document.getElementById('title').textContent = "Loading...";
       document.getElementById('meta').textContent = "";
@@ -283,8 +300,7 @@
       }
     }
 
-    function transpose(amount) {
-      currentTransposeSemitones += amount;
+    function updateUrlParams() {
       const url = new URL(window.location);
       url.searchParams.set('song', currentFile);
       if (currentTransposeSemitones !== 0) {
@@ -292,8 +308,28 @@
       } else {
         url.searchParams.delete('t');
       }
+      if (currentFontSize !== 1.1) {
+        url.searchParams.set('f', currentFontSize.toFixed(1));
+      } else {
+        url.searchParams.delete('f');
+      }
       history.pushState({}, '', url);
+    }
+
+    function transpose(amount) {
+      currentTransposeSemitones += amount;
+      updateUrlParams();
       parseAndRenderSong(currentRawText, currentFile, currentTransposeSemitones);
+    }
+
+    function adjustFontSize(delta) {
+      currentFontSize = Math.round((currentFontSize + delta) * 10) / 10;
+      // Clamp size between 0.8rem and 2.0rem
+      if (currentFontSize < 0.8) currentFontSize = 0.8;
+      if (currentFontSize > 2.0) currentFontSize = 2.0;
+
+      document.documentElement.style.setProperty('--song-font-size', currentFontSize + 'rem');
+      updateUrlParams();
     }
 
     function transposeChord(chord, semitones) {
